@@ -1,108 +1,55 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<title>Redeem Voucher KasinoJP</title>
-
-<!-- FIREBASE 8 -->
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-
-<style>
-body {
-    font-family: Arial;
-    background: #111;
-    color: white;
-    padding: 20px;
-    text-align: center;
-}
-input {
-    width: 80%;
-    padding: 10px;
-    margin: 10px 0;
-    border-radius: 5px;
-    border: none;
-}
-button {
-    width: 85%;
-    padding: 12px;
-    background: gold;
-    color: black;
-    border: none;
-    font-size: 16px;
-    font-weight: bold;
-    border-radius: 5px;
-    cursor: pointer;
-}
-#result {
-    margin-top: 20px;
-    font-size: 18px;
-    font-weight: bold;
-}
-</style>
+    <meta charset="UTF-8">
+    <title>Cek Voucher</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
 </head>
 
-<body>
+<body class="bg-light">
 
-<h2>🎁 Redeem Voucher KasinoJP</h2>
-<input id="voucherInput" placeholder="Masukkan Kode Voucher (contoh: XMAS123)">
-<button id="btnRedeem">CLAIM VOUCHER</button>
+<div class="container mt-5">
+    <div class="card p-4 shadow">
+        <h3 class="mb-3">Masukkan Kode Voucher</h3>
 
-<p id="result"></p>
+        <input id="kode" class="form-control mb-3" placeholder="Contoh: A1B2C3">
+        <button class="btn btn-primary w-100" id="cekBtn">Cek Voucher</button>
+    </div>
+</div>
 
-<script>
-// =============================
-// FIREBASE CONFIG
-// =============================
-const firebaseConfig = {
-  apiKey: "AIzaSyCvqbWpS1s_l72Fh8CLxO2jWFnEbSSIGSk",
-  authDomain: "kasinojpwork.firebaseapp.com",
-  projectId: "kasinojpwork",
-  storageBucket: "kasinojpwork.appspot.com",
-  messagingSenderId: "291449017470",
-  appId: "1:291449017470:web:14d6815edcd61f3618b42f"
-};
+<script type="module">
+    import { db } from "./firebase-config.js";
+    import { ref, get, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+    document.getElementById("cekBtn").onclick = async () => {
+        const kode = document.getElementById("kode").value.trim();
+        if (!kode) return alert("Masukkan kode!");
 
-// =============================
-// Redeem Voucher
-// =============================
-document.getElementById("btnRedeem").addEventListener("click", async () => {
-    const code = document.getElementById("voucherInput").value.trim();
-    const result = document.getElementById("result");
+        const snap = await get(ref(db, "vouchers"));
+        if (!snap.exists()) return alert("Tidak ada voucher!");
 
-    if (!code) {
-        result.style.color = "red";
-        result.textContent = "Masukkan kode voucher!";
-        return;
-    }
+        let valid = false;
 
-    const docRef = db.collection("vouchers").doc(code);
-    const docSnap = await docRef.get();
+        snap.forEach(child => {
+            const v = child.val();
 
-    if (!docSnap.exists) {
-        result.style.color = "red";
-        result.textContent = "Voucher tidak ditemukan!";
-        return;
-    }
+            if (v.kode === kode) {
+                valid = true;
 
-    const data = docSnap.data();
+                if (v.status === "Sudah Digunakan") {
+                    alert("Kode sudah digunakan!");
+                } else {
+                    update(ref(db, "vouchers/" + child.key), {
+                        status: "Sudah Digunakan",
+                        used_at: new Date().toISOString()
+                    });
+                    alert("Voucher valid! Hadiah: " + v.hadiah);
+                }
+            }
+        });
 
-    if (data.used) {
-        result.style.color = "orange";
-        result.textContent = `Voucher ini sudah dipakai!`;
-        return;
-    }
-
-    // Tandai voucher sebagai sudah dipakai
-    await docRef.update({ used: true });
-
-    result.style.color = "lime";
-    result.textContent = `🎉 Voucher berhasil! Hadiah: ${data.prize}`;
-    document.getElementById("voucherInput").value = "";
-});
+        if (!valid) alert("Kode salah!");
+    };
 </script>
 
 </body>
