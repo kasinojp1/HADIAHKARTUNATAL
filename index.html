@@ -1,0 +1,72 @@
+<html lang="id">
+const code = document.getElementById('codeInput').value.trim();
+prizeArea.style.display='none';
+if(!code){ showStatus('Masukkan kode voucher terlebih dahulu', true); return }
+
+
+showStatus('Memeriksa voucher...');
+
+
+const docRef = db.collection('vouchers').doc(code);
+
+
+try{
+await db.runTransaction(async (tx)=>{
+const doc = await tx.get(docRef);
+if(!doc.exists){
+throw new Error('Voucher tidak ditemukan.');
+}
+const data = doc.data();
+if(data.used){
+throw new Error('Voucher ini sudah dipakai.');
+}
+// tandai used dan simpan prize (untuk keamanan ambil prize sebelum update)
+tx.update(docRef, { used: true, redeemedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+
+// simpan prize di session (tidak dari tx return, jadi set global)
+window.__redeemedPrize = data.prize || 'Hadiah Misteri';
+});
+
+
+showStatus('Voucher valid! Mengacak kartu...');
+revealCardsAndShowPrize();
+}catch(err){
+console.error(err);
+showStatus(err.message || 'Terjadi kesalahan saat verifikasi', true);
+}
+});
+
+
+function randomSymbol(){
+return symbols[Math.floor(Math.random()*symbols.length)];
+}
+
+
+function revealCardsAndShowPrize(){
+const cards = Array.from(document.querySelectorAll('.card'));
+// assign random symbols
+cards.forEach(c=>{ c.textContent = '❓'; c.classList.remove('revealed') });
+
+
+// reveal satu per satu
+let i=0;
+const interval = setInterval(()=>{
+if(i>=cards.length){ clearInterval(interval);
+// setelah semua ter-reveal, tampilkan prize
+setTimeout(()=>{
+const prize = window.__redeemedPrize || 'Hadiah Misteri';
+prizeArea.style.display='block';
+prizeArea.textContent = '🎉 Selamat! Anda mendapatkan: ' + prize;
+},400);
+return;
+}
+const sym = randomSymbol();
+cards[i].textContent = sym;
+cards[i].classList.add('revealed');
+i++;
+},180);
+}
+</script>
+</body>
+</html>
