@@ -2,166 +2,107 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>Voucher Xmas KasinoJP</title>
+<title>Redeem Voucher KasinoJP</title>
 
-<!-- Firebase -->
+<!-- FIREBASE 8 -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
 <style>
-    body {
-        background: #111;
-        color: white;
-        font-family: Arial;
-        text-align: center;
-    }
-    .cards {
-        display: grid;
-        grid-template-columns: repeat(3, 100px);
-        grid-gap: 10px;
-        justify-content: center;
-        margin-top: 20px;
-    }
-    .card {
-        background: #222;
-        padding: 20px;
-        font-size: 40px;
-        border-radius: 10px;
-        border: 2px solid #333;
-        transition: 0.2s;
-    }
-    .card.revealed {
-        background: #333;
-        border-color: gold;
-    }
-    #prizeArea {
-        display: none;
-        margin-top: 20px;
-        font-size: 22px;
-        color: #0f0;
-    }
+body {
+    font-family: Arial;
+    background: #111;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+input {
+    width: 80%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+    border: none;
+}
+button {
+    width: 85%;
+    padding: 12px;
+    background: gold;
+    color: black;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#result {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+}
 </style>
 </head>
 
 <body>
 
-<h2>🎄 Masukkan Kode Voucher</h2>
+<h2>🎁 Redeem Voucher KasinoJP</h2>
+<input id="voucherInput" placeholder="Masukkan Kode Voucher (contoh: XMAS123)">
+<button id="btnRedeem">CLAIM VOUCHER</button>
 
-<input id="voucherInput" placeholder="Masukkan kode" style="padding:10px">
-<button id="checkBtn" style="padding:10px">Verifikasi</button>
-
-<p id="status"></p>
-
-<div class="cards">
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-    <div class="card">❓</div>
-</div>
-
-<div id="prizeArea"></div>
+<p id="result"></p>
 
 <script>
-/* ===========================
-   FIREBASE CONFIG KAMU
-   =========================== */
+// =============================
+// FIREBASE CONFIG
+// =============================
 const firebaseConfig = {
   apiKey: "AIzaSyCvqbWpS1s_l72Fh8CLxO2jWFnEbSSIGSk",
   authDomain: "kasinojpwork.firebaseapp.com",
-  databaseURL: "https://kasinojpwork-default-rtdb.firebaseio.com",
   projectId: "kasinojpwork",
-  storageBucket: "kasinojpwork.firebasestorage.app",
+  storageBucket: "kasinojpwork.appspot.com",
   messagingSenderId: "291449017470",
-  appId: "1:291449017470:web:14d6815edcd61f3618b42f",
-  measurementId: "G-D648ETD7YD"
+  appId: "1:291449017470:web:14d6815edcd61f3618b42f"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-/* ===========================
-   LOGIC VOUCHER
-   =========================== */
+// =============================
+// Redeem Voucher
+// =============================
+document.getElementById("btnRedeem").addEventListener("click", async () => {
+    const code = document.getElementById("voucherInput").value.trim();
+    const result = document.getElementById("result");
 
-const voucherInput = document.getElementById('voucherInput');
-const checkBtn = document.getElementById('checkBtn');
-const prizeArea = document.getElementById('prizeArea');
-
-const symbols = ['🎅','🎁','❄️','🔔','🌟'];
-
-function showStatus(msg, error){
-    const st = document.getElementById('status');
-    st.textContent = msg;
-    st.style.color = error ? 'red' : 'white';
-}
-
-checkBtn.addEventListener('click', async ()=>{
-    const code = voucherInput.value.trim();
-    if(!code){
-        showStatus('Masukkan kode voucher terlebih dahulu', true);
+    if (!code) {
+        result.style.color = "red";
+        result.textContent = "Masukkan kode voucher!";
         return;
     }
 
-    showStatus('Memeriksa voucher...');
-    const docRef = db.collection('vouchers').doc(code);
+    const docRef = db.collection("vouchers").doc(code);
+    const docSnap = await docRef.get();
 
-    try{
-        await db.runTransaction(async (tx)=>{
-            const doc = await tx.get(docRef);
-            if(!doc.exists) throw new Error('Voucher tidak ditemukan.');
-            
-            const data = doc.data();
-            if(data.used) throw new Error('Voucher ini sudah dipakai.');
-
-            window.__redeemedPrize = data.prize || 'Hadiah Misteri';
-            tx.update(docRef, {
-                used: true,
-                redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        });
-
-        showStatus('Voucher valid! Mengacak kartu...');
-        revealCardsAndShowPrize();
-
-    } catch(err){
-        console.error(err);
-        showStatus(err.message || 'Terjadi kesalahan saat verifikasi', true);
+    if (!docSnap.exists) {
+        result.style.color = "red";
+        result.textContent = "Voucher tidak ditemukan!";
+        return;
     }
+
+    const data = docSnap.data();
+
+    if (data.used) {
+        result.style.color = "orange";
+        result.textContent = `Voucher ini sudah dipakai!`;
+        return;
+    }
+
+    // Tandai voucher sebagai sudah dipakai
+    await docRef.update({ used: true });
+
+    result.style.color = "lime";
+    result.textContent = `🎉 Voucher berhasil! Hadiah: ${data.prize}`;
+    document.getElementById("voucherInput").value = "";
 });
-
-function randomSymbol(){
-    return symbols[Math.floor(Math.random()*symbols.length)];
-}
-
-function revealCardsAndShowPrize(){
-    const cards = Array.from(document.querySelectorAll('.card'));
-    cards.forEach(c => {
-        c.textContent = '❓';
-        c.classList.remove('revealed');
-    });
-
-    let i = 0;
-    const interval = setInterval(() => {
-        if(i >= cards.length){
-            clearInterval(interval);
-            setTimeout(()=>{
-                prizeArea.style.display = 'block';
-                prizeArea.textContent =
-                    '🎉 Selamat! Anda mendapatkan: ' + (window.__redeemedPrize || 'Hadiah Misteri');
-            }, 400);
-            return;
-        }
-        const sym = randomSymbol();
-        cards[i].textContent = sym;
-        cards[i].classList.add('revealed');
-        i++;
-    }, 180);
-}
 </script>
 
 </body>
