@@ -1,83 +1,168 @@
+<!DOCTYPE html>
 <html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Voucher Xmas KasinoJP</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+<style>
+    body {
+        background: #111;
+        color: white;
+        font-family: Arial;
+        text-align: center;
+    }
+    .cards {
+        display: grid;
+        grid-template-columns: repeat(3, 100px);
+        grid-gap: 10px;
+        justify-content: center;
+        margin-top: 20px;
+    }
+    .card {
+        background: #222;
+        padding: 20px;
+        font-size: 40px;
+        border-radius: 10px;
+        border: 2px solid #333;
+        transition: 0.2s;
+    }
+    .card.revealed {
+        background: #333;
+        border-color: gold;
+    }
+    #prizeArea {
+        display: none;
+        margin-top: 20px;
+        font-size: 22px;
+        color: #0f0;
+    }
+</style>
+</head>
+
+<body>
+
+<h2>🎄 Masukkan Kode Voucher</h2>
+
+<input id="voucherInput" placeholder="Masukkan kode" style="padding:10px">
+<button id="checkBtn" style="padding:10px">Verifikasi</button>
+
+<p id="status"></p>
+
+<div class="cards">
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+    <div class="card">❓</div>
+</div>
+
+<div id="prizeArea"></div>
+
+<script>
+/* ===========================
+   FIREBASE CONFIG KAMU
+   =========================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyCvqbWpS1s_l72Fh8CLxO2jWFnEbSSIGSk",
+  authDomain: "kasinojpwork.firebaseapp.com",
+  databaseURL: "https://kasinojpwork-default-rtdb.firebaseio.com",
+  projectId: "kasinojpwork",
+  storageBucket: "kasinojpwork.firebasestorage.app",
+  messagingSenderId: "291449017470",
+  appId: "1:291449017470:web:14d6815edcd61f3618b42f",
+  measurementId: "G-D648ETD7YD"
+};
+
 firebase.initializeApp(firebaseConfig);
-}
 const db = firebase.firestore();
 
+/* ===========================
+   LOGIC VOUCHER
+   =========================== */
 
-// FIXED: menangkap elemen HTML yg hilang
 const voucherInput = document.getElementById('voucherInput');
 const checkBtn = document.getElementById('checkBtn');
 const prizeArea = document.getElementById('prizeArea');
 
-
 const symbols = ['🎅','🎁','❄️','🔔','🌟'];
 
-
 function showStatus(msg, error){
-const st = document.getElementById('status');
-st.textContent = msg;
-st.style.color = error ? 'red' : 'white';
+    const st = document.getElementById('status');
+    st.textContent = msg;
+    st.style.color = error ? 'red' : 'white';
 }
-
 
 checkBtn.addEventListener('click', async ()=>{
-const code = voucherInput.value.trim();
-if(!code){ showStatus('Masukkan kode voucher terlebih dahulu', true); return }
+    const code = voucherInput.value.trim();
+    if(!code){
+        showStatus('Masukkan kode voucher terlebih dahulu', true);
+        return;
+    }
 
+    showStatus('Memeriksa voucher...');
+    const docRef = db.collection('vouchers').doc(code);
 
-showStatus('Memeriksa voucher...');
-const docRef = db.collection('vouchers').doc(code);
+    try{
+        await db.runTransaction(async (tx)=>{
+            const doc = await tx.get(docRef);
+            if(!doc.exists) throw new Error('Voucher tidak ditemukan.');
+            
+            const data = doc.data();
+            if(data.used) throw new Error('Voucher ini sudah dipakai.');
 
+            window.__redeemedPrize = data.prize || 'Hadiah Misteri';
+            tx.update(docRef, {
+                used: true,
+                redeemedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        });
 
-try{
-await db.runTransaction(async (tx)=>{
-const doc = await tx.get(docRef);
-if(!doc.exists) throw new Error('Voucher tidak ditemukan.');
+        showStatus('Voucher valid! Mengacak kartu...');
+        revealCardsAndShowPrize();
 
-
-const data = doc.data();
-if(data.used) throw new Error('Voucher ini sudah dipakai.');
-
-
-window.__redeemedPrize = data.prize || 'Hadiah Misteri';
-tx.update(docRef, { used: true, redeemedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } catch(err){
+        console.error(err);
+        showStatus(err.message || 'Terjadi kesalahan saat verifikasi', true);
+    }
 });
 
-
-showStatus('Voucher valid! Mengacak kartu...');
-revealCardsAndShowPrize();
-
-
-}catch(err){
-console.error(err);
-showStatus(err.message || 'Terjadi kesalahan saat verifikasi', true);
+function randomSymbol(){
+    return symbols[Math.floor(Math.random()*symbols.length)];
 }
-});
-
-
-function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)] }
-
 
 function revealCardsAndShowPrize(){
-const cards = Array.from(document.querySelectorAll('.card'));
-cards.forEach(c=>{ c.textContent = '❓'; c.classList.remove('revealed') });
+    const cards = Array.from(document.querySelectorAll('.card'));
+    cards.forEach(c => {
+        c.textContent = '❓';
+        c.classList.remove('revealed');
+    });
 
-
-let i=0;
-const interval = setInterval(()=>{
-if(i>=cards.length){ clearInterval(interval);
-setTimeout(()=>{
-prizeArea.style.display='block';
-prizeArea.textContent = '🎉 Selamat! Anda mendapatkan: ' + (window.__redeemedPrize||'Hadiah Misteri');
-},400);
-return;
-}
-const sym = randomSymbol();
-cards[i].textContent = sym;
-cards[i].classList.add('revealed');
-i++;
-},180);
+    let i = 0;
+    const interval = setInterval(() => {
+        if(i >= cards.length){
+            clearInterval(interval);
+            setTimeout(()=>{
+                prizeArea.style.display = 'block';
+                prizeArea.textContent =
+                    '🎉 Selamat! Anda mendapatkan: ' + (window.__redeemedPrize || 'Hadiah Misteri');
+            }, 400);
+            return;
+        }
+        const sym = randomSymbol();
+        cards[i].textContent = sym;
+        cards[i].classList.add('revealed');
+        i++;
+    }, 180);
 }
 </script>
+
 </body>
 </html>
