@@ -1,34 +1,53 @@
 <html lang="id">
+firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+
+
+// FIXED: menangkap elemen HTML yg hilang
+const voucherInput = document.getElementById('voucherInput');
+const checkBtn = document.getElementById('checkBtn');
+const prizeArea = document.getElementById('prizeArea');
+
+
+const symbols = ['🎅','🎁','❄️','🔔','🌟'];
+
+
+function showStatus(msg, error){
+const st = document.getElementById('status');
+st.textContent = msg;
+st.style.color = error ? 'red' : 'white';
+}
+
+
+checkBtn.addEventListener('click', async ()=>{
+const code = voucherInput.value.trim();
 if(!code){ showStatus('Masukkan kode voucher terlebih dahulu', true); return }
 
 
 showStatus('Memeriksa voucher...');
-
-
 const docRef = db.collection('vouchers').doc(code);
 
 
 try{
 await db.runTransaction(async (tx)=>{
 const doc = await tx.get(docRef);
-if(!doc.exists){
-throw new Error('Voucher tidak ditemukan.');
-}
+if(!doc.exists) throw new Error('Voucher tidak ditemukan.');
+
+
 const data = doc.data();
-if(data.used){
-throw new Error('Voucher ini sudah dipakai.');
-}
-// tandai used dan simpan prize (untuk keamanan ambil prize sebelum update)
-tx.update(docRef, { used: true, redeemedAt: firebase.firestore.FieldValue.serverTimestamp() });
+if(data.used) throw new Error('Voucher ini sudah dipakai.');
 
 
-// simpan prize di session (tidak dari tx return, jadi set global)
 window.__redeemedPrize = data.prize || 'Hadiah Misteri';
+tx.update(docRef, { used: true, redeemedAt: firebase.firestore.FieldValue.serverTimestamp() });
 });
 
 
 showStatus('Voucher valid! Mengacak kartu...');
 revealCardsAndShowPrize();
+
+
 }catch(err){
 console.error(err);
 showStatus(err.message || 'Terjadi kesalahan saat verifikasi', true);
@@ -36,26 +55,20 @@ showStatus(err.message || 'Terjadi kesalahan saat verifikasi', true);
 });
 
 
-function randomSymbol(){
-return symbols[Math.floor(Math.random()*symbols.length)];
-}
+function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)] }
 
 
 function revealCardsAndShowPrize(){
 const cards = Array.from(document.querySelectorAll('.card'));
-// assign random symbols
 cards.forEach(c=>{ c.textContent = '❓'; c.classList.remove('revealed') });
 
 
-// reveal satu per satu
 let i=0;
 const interval = setInterval(()=>{
 if(i>=cards.length){ clearInterval(interval);
-// setelah semua ter-reveal, tampilkan prize
 setTimeout(()=>{
-const prize = window.__redeemedPrize || 'Hadiah Misteri';
 prizeArea.style.display='block';
-prizeArea.textContent = '🎉 Selamat! Anda mendapatkan: ' + prize;
+prizeArea.textContent = '🎉 Selamat! Anda mendapatkan: ' + (window.__redeemedPrize||'Hadiah Misteri');
 },400);
 return;
 }
